@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-BASE_URL = "http://127.0.0.1:8787"
+BASE_URL = "https://cloud.t0257354.workers.dev"
 DEVICE_ID = "my-render-pc"
 
 
