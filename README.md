@@ -1,103 +1,151 @@
 # Render Anywhere
 
-**Keep up with your Blender renders remotely, from your phone.**
+Keep up with your Blender renders remotely from your phone.
 
-Render Anywhere is a personal software project exploring how to monitor Blender renders remotely. It uses a Cloudflare Workers relay and Durable Objects to support communication between a rendering PC and remote clients, with a secure phone-pairing workflow.
+Render Anywhere is an open-source project designed to let you check render progress and system statistics on a phone while Blender renders on your PC. The project combines a Blender add-on, a PC-side monitoring script, a cloud relay, and a mobile app.
 
-> **Project status: In development.** The local relay, authentication checks, and phone-pairing flow have been tested locally.
+> **Project status:** In active development. The current setup has been tested with Blender 5.2 on Windows and an NVIDIA GPU. Other systems and configurations may require additional setup or testing.
 
 ## Features
 
-- **Render monitoring:** Designed to report render progress and system statistics from a PC running Blender.
-- **Cloud relay:** Uses Cloudflare Workers and Durable Objects to route requests by device ID.
-- **Phone pairing:** Implements temporary pairing sessions so a phone can request access and the PC can approve it.
-- **Credential security:** Uses hashed phone credentials, expiring pairing sessions, and credential replacement.
-- **Authentication:** Rejects unauthenticated requests and invalid phone credentials.
-- **Device isolation:** Tests that a phone credential for one device cannot be used to access another.
-- **Automated checks:** Includes scripts for testing authentication and the pairing workflow.
+- **Live render progress** — view the current frame, sample progress, and overall animation progress where available.
+- **Time estimates** — monitor elapsed time and estimated remaining time.
+- **System statistics** — view available CPU, RAM, and GPU metrics.
+- **Remote monitoring** — receive updates on your phone through a cloud relay rather than relying exclusively on your local Wi-Fi.
+- **Self-hostable infrastructure** — configure your own Cloudflare Worker deployment.
+- **Open source** — inspect, modify, and contribute to the project.
 
-## Technology stack
+Available metrics depend on the Blender version, render engine, hardware, and installed dependencies.
 
-| Technology | Purpose |
-|---|---|
-| Python | Local integration tests and the PC-side monitoring component |
-| TypeScript | Cloud relay and request handling |
-| Cloudflare Workers | Relay runtime |
-| Cloudflare Durable Objects | Device-specific routing and state |
-| WebSockets | Real-time communication |
-| Node.js and npm | Development tooling and dependency management |
-
-## Architecture
+## How it works
 
 ```text
-Blender on rendering PC
-          |
-          v
-PC-side monitoring component
-          |
-          v
+Blender
+   │
+   ▼
+Render Anywhere add-on
+   │
+   ▼
+PC-side monitoring script
+   │
+   ▼
 Cloudflare Worker relay
-          |
-          v
-Device-specific Durable Object
-          |
-          v
-Paired phone / remote client
+   │
+   ▼
+Mobile app
 ```
 
-The PC-side monitoring component collects render information. The relay is responsible for routing communication, while the pairing workflow controls which phone credentials are accepted.
+The Blender add-on collects render information, while the PC-side monitor gathers available system statistics. The relay transports updates to the mobile app.
 
-The diagram represents the intended system architecture; full remote operation has not yet been verified in production.
+The cloud relay is separate from the monitoring software running on the PC.
 
-## Local development
+## Project structure
 
-### Requirements
+```text
+render-anywhere/
+├── addon/
+│   └── __init__.py
+├── src/
+├── package.json
+├── package-lock.json
+├── wrangler.jsonc
+├── pair_production.py
+├── test_pairing.py
+└── README.md
+```
 
-- Windows, macOS, or Linux
-- Node.js and npm
-- Python 3
-- A Cloudflare Wrangler development environment
-- A local `.dev.vars` file containing the required `RELAY_SECRET`
+The repository contains the Blender add-on and cloud relay code, along with pairing utilities. The PC-side monitor and mobile application may be maintained in separate directories or components depending on the current project layout.
 
-### 1. Clone the repository
+## Requirements
+
+Before setting up your own deployment, prepare:
+
+- A Windows, Linux, or macOS PC capable of running Blender.
+- A compatible Blender installation.
+- Python for the PC-side monitoring script.
+- Node.js and npm for the Cloudflare Worker development environment.
+- A Cloudflare account for deploying your own relay.
+- A compatible mobile app environment or a built version of the app.
+
+Some GPU statistics require additional platform-specific dependencies. NVIDIA GPU monitoring may require the NVIDIA Management Library Python bindings and a compatible NVIDIA driver. CPU and memory metrics may require `psutil`.
+
+## Getting started
+
+### 1. Download the repository
+
+Clone the repository and enter the project directory:
 
 ```bash
 git clone https://github.com/hoasked/render-anywhere.git
 cd render-anywhere
 ```
 
-### 2. Install dependencies
+If the repository's cloud code is in a subdirectory, enter that directory before running the following cloud setup commands.
+
+### 2. Set up the cloud relay
+
+Install the Node.js dependencies:
 
 ```bash
 npm install
 ```
 
-### 3. Configure the local secret
+Configure the Cloudflare Worker using the supplied `wrangler.jsonc` configuration.
 
-Create a `.dev.vars` file in the project root and define a strong, private `RELAY_SECRET` value.
+For local development, create a local `.dev.vars` file with a randomly generated, private relay secret:
 
-Never commit `.dev.vars`, publish the secret, or reuse development credentials in production.
-
-### 4. Start the local relay
-
-```bash
-npm run dev
+```dotenv
+RELAY_SECRET=replace-with-your-own-secret
 ```
 
-### 5. Check TypeScript
-
-In another terminal, run:
+Start the local Worker using the development command configured in `package.json`, commonly:
 
 ```bash
-npx tsc --noEmit
+npx wrangler dev
 ```
 
-### 6. Run the integration checks
+Follow the project's Cloudflare configuration and logs to confirm that the Worker starts successfully.
 
-With the local relay running, execute:
+### 3. Configure your own production relay
 
-```bash
-py test_auth.py
-py test_pairing.py
-```
+To monitor renders over the internet, deploy your own Worker and configure the PC-side monitor and mobile app to use its URL.
 
+Set the relay secret in your deployment's secret configuration. Keep the secret private and separate from the public repository.
+
+Do not assume the repository owner's deployed relay is a public service for general use. Each deployment should use its own configuration and credentials.
+
+### 4. Install the Blender add-on
+
+Install the add-on from the repository's `addon` directory, following the directory structure expected by Blender.
+
+Enable the add-on in Blender and turn on Render Anywhere monitoring in its panel.
+
+If your Blender version does not load the add-on automatically, check the installation directory and Blender's console for errors.
+
+### 5. Configure the PC-side monitor
+
+Set up the PC-side monitoring script with the Python dependencies it requires. Configure it to use your relay URL and the same private relay secret expected by your deployment.
+
+Start the monitoring process before or while rendering. Keep it running for the duration of the render.
+
+Never publish your relay secret, phone credentials, or local environment files.
+
+### 6. Connect the mobile app
+
+Build or install the mobile app using the instructions provided by its project directory.
+
+Configure it to connect to your relay and complete the supported pairing flow. The PC and phone must use matching deployment configuration and valid credentials.
+
+### 7. Test a render
+
+Start a small test render in Blender and check that the mobile app receives updates.
+
+Verify that frame progress, sample progress, timing information, and available system statistics change as the render proceeds.
+
+If the phone remains idle, check the Blender add-on, PC-side monitor, relay logs, and pairing configuration.
+
+## Security
+
+- Never commit `.dev.vars`, phone credentials, access tokens, or private keys.
+- Keep dependencies and deployment configuration up to date.
+- Review the authentication and pairing implementation before exposing a deployment to other users.
